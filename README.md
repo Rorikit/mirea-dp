@@ -51,6 +51,10 @@ Backend: `pip install -e ".[dev]"`, задать `APP_DATABASE_URL`, затем 
 `APP_LOGIN_RATE_LIMIT=0`. Положительное значение включает лимит обратно;
 production должен использовать значение не меньше `5`.
 
+Для изолированного развертывания на VPS без сборки образов на сервере используется
+`docker-compose.server.yml`. Reverse proxy публикуется только на
+`168.222.202.190:8080`, не занимая общие порты `80/443` другого проекта.
+
 ## Миграции
 
 - Применение: `docker compose run --rm backend alembic upgrade head`.
