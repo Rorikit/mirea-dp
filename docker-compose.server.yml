@@ -24,7 +24,7 @@ services:
       APP_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-freshman}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-freshman}
       APP_SECRET_KEY: ${APP_SECRET_KEY:?APP_SECRET_KEY is required}
       APP_QR_PEPPER: ${APP_QR_PEPPER:?APP_QR_PEPPER is required}
-      APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-http://168.222.202.190:8080}
+      APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-http://168.222.202.160:8080}
       APP_LOGIN_RATE_LIMIT: ${APP_LOGIN_RATE_LIMIT:-5}
       APP_SECURE_COOKIES: "false"
       APP_UPLOAD_DIR: /data/uploads
@@ -52,7 +52,7 @@ services:
     image: mirea-dp-nginx:latest
     restart: unless-stopped
     ports:
-      - "168.222.202.190:8080:8080"
+      - "168.222.202.160:8080:8080"
     volumes:
       - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
