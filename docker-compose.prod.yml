@@ -1,0 +1,20 @@
+services:
+  db:
+    restart: unless-stopped
+  backend:
+    restart: unless-stopped
+    environment:
+      APP_ENVIRONMENT: production
+      APP_SECRET_KEY: ${APP_SECRET_KEY:?APP_SECRET_KEY is required}
+      APP_QR_PEPPER: ${APP_QR_PEPPER:?APP_QR_PEPPER is required}
+      APP_LOGIN_RATE_LIMIT: ${APP_LOGIN_RATE_LIMIT:-5}
+      APP_SECURE_COOKIES: "true"
+      APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:?APP_CORS_ORIGINS is required}
+  frontend:
+    restart: unless-stopped
+  nginx:
+    restart: unless-stopped
+    ports: ["80:8080", "443:8443"]
+    volumes:
+      - ./infrastructure/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ${TLS_DIR:?TLS_DIR is required}:/etc/nginx/tls:ro
