@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router";
 import { z } from "zod";
-import { api, errorMessage, EVENT_SLUG } from "../shared/api";
+import { api, errorMessage, EVENT_SLUG, idempotencyKey } from "../shared/api";
 import { Empty, Loading, Status } from "../shared/ui";
 
 type Qr = { token: string; purpose: "ENTRY" | "EXIT"; expires_at: string };
@@ -29,7 +29,7 @@ export function RegisterPage() {
     setError("");
     try {
       const lookup = await api<{ lookup_token: string }>("/public/registrations/lookup", { method: "POST", body: JSON.stringify({ event_slug: EVENT_SLUG, ...values }) });
-      setProfile(await api<Profile>("/public/registrations", { method: "POST", body: JSON.stringify({ lookup_token: lookup.lookup_token }), headers: { "Idempotency-Key": crypto.randomUUID() } }));
+      setProfile(await api<Profile>("/public/registrations", { method: "POST", body: JSON.stringify({ lookup_token: lookup.lookup_token }), headers: { "Idempotency-Key": idempotencyKey() } }));
     } catch (caught) { setError(errorMessage(caught)); }
   }
   if (profile?.qr) return <section><h1>Ваш QR-код готов</h1><Status type="success">Регистрация выполнена</Status><QrCard qr={profile.qr} /><Link className="button" to="/me">Открыть личный кабинет</Link></section>;
@@ -39,7 +39,7 @@ export function RegisterPage() {
 export function MePage() {
   const [qr, setQr] = useState<Qr | null>(null);
   const profile = useQuery({ queryKey: ["me"], queryFn: () => api<Profile>("/public/registrations/me") });
-  async function createQr() { setQr(await api<Qr>("/public/registrations/me/qr", { method: "POST", body: JSON.stringify({ purpose: profile.data?.presence_status === "INSIDE" ? "EXIT" : "ENTRY" }), headers: { "Idempotency-Key": crypto.randomUUID() } })); }
+  async function createQr() { setQr(await api<Qr>("/public/registrations/me/qr", { method: "POST", body: JSON.stringify({ purpose: profile.data?.presence_status === "INSIDE" ? "EXIT" : "ENTRY" }), headers: { "Idempotency-Key": idempotencyKey() } })); }
   if (profile.isLoading) return <Loading />;
   if (profile.error) return <Status type="error">{errorMessage(profile.error)}</Status>;
   return <section><h1>Личный кабинет</h1><dl><dt>ФИО</dt><dd>{profile.data?.full_name}</dd><dt>Группа</dt><dd>{profile.data?.study_group}</dd><dt>Институт</dt><dd>{profile.data?.institute}</dd><dt>Статус</dt><dd>{profile.data?.presence_status === "INSIDE" ? "Вы находитесь на мероприятии" : "Вы можете войти"}</dd></dl>{qr ? <QrCard qr={qr} /> : <button onClick={createQr}>Показать новый QR-код</button>}</section>;

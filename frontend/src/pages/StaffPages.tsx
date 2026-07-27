@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate } from "react-router";
 import { z } from "zod";
 import { CameraScanner } from "../features/scanner/CameraScanner";
-import { api, download, errorMessage, EVENT_SLUG, getStaffRole, isAuthenticated, setAuth, staffHome, type StaffRole } from "../shared/api";
+import { api, download, errorMessage, EVENT_SLUG, getStaffRole, idempotencyKey, isAuthenticated, setAuth, staffHome, type StaffRole } from "../shared/api";
 import { Empty, Loading, Status } from "../shared/ui";
 
 const loginSchema = z.object({ username: z.string().min(1, "Введите логин"), password: z.string().min(12, "Минимум 12 символов") });
@@ -38,7 +38,7 @@ function tokenFromCode(code: string) { try { const url = new URL(code); return u
 export function ScannerPage() {
   const [manual, setManual] = useState("");
   const [result, setResult] = useState<ScanResult | null>(null);
-  const mutation = useMutation({ mutationFn: (code: string) => api<ScanResult>("/operator/scans", { method: "POST", body: JSON.stringify({ token: tokenFromCode(code), device_info: { user_agent: navigator.userAgent } }), headers: { "Idempotency-Key": crypto.randomUUID() } }), onSuccess: data => { setResult(data); navigator.vibrate?.(100); }, onError: () => navigator.vibrate?.([150, 80, 150]) });
+  const mutation = useMutation({ mutationFn: (code: string) => api<ScanResult>("/operator/scans", { method: "POST", body: JSON.stringify({ token: tokenFromCode(code), device_info: { user_agent: navigator.userAgent } }), headers: { "Idempotency-Key": idempotencyKey() } }), onSuccess: data => { setResult(data); navigator.vibrate?.(100); }, onError: () => navigator.vibrate?.([150, 80, 150]) });
   return <section className="wide"><h1>QR-сканер</h1><CameraScanner onCode={code => !mutation.isPending && mutation.mutate(code)} /><div className="manual"><label>Ручной ввод кода<input value={manual} onChange={event => setManual(event.target.value)} /></label><button disabled={!manual || mutation.isPending} onClick={() => mutation.mutate(manual)}>Проверить</button></div>{mutation.isPending && <Status>Проверяем QR-код…</Status>}{mutation.error && <Status type="error">{errorMessage(mutation.error)}</Status>}{result && <Status type="success"><strong>{result.event_type === "ENTRY" ? "Вход разрешён" : "Выход зарегистрирован"}</strong><br />{result.full_name} · {result.study_group} · {result.institute}<br />{result.previous_status} → {result.new_status}</Status>}<Link to="/operator/recent">Последние операции</Link></section>;
 }
 
@@ -66,7 +66,7 @@ export function ImportPage() {
   const [batch, setBatch] = useState<Batch | null>(null);
   const [error, setError] = useState("");
   async function upload() { if (!file || !event.data) return; setError(""); const body = new FormData(); body.append("event_id", event.data.id); body.append("file", file); try { setBatch(await api<Batch>("/admin/imports", { method: "POST", body })); } catch (caught) { setError(errorMessage(caught)); } }
-  async function confirm() { if (!batch) return; try { setBatch(await api<Batch>(`/admin/imports/${batch.id}/confirm`, { method: "POST", body: JSON.stringify({ preview_version: batch.preview_version, accept_warnings: true, confirm_deactivations: true, confirmation_phrase: batch.deactivated_rows >= 100 ? "ДЕАКТИВИРОВАТЬ" : null }), headers: { "Idempotency-Key": crypto.randomUUID() } })); } catch (caught) { setError(errorMessage(caught)); } }
+  async function confirm() { if (!batch) return; setError(""); try { setBatch(await api<Batch>(`/admin/imports/${batch.id}/confirm`, { method: "POST", body: JSON.stringify({ preview_version: batch.preview_version, accept_warnings: true, confirm_deactivations: true, confirmation_phrase: batch.deactivated_rows >= 100 ? "ДЕАКТИВИРОВАТЬ" : null }), headers: { "Idempotency-Key": idempotencyKey() } })); } catch (caught) { setError(errorMessage(caught)); } }
   return <section className="wide"><h1>Импорт студентов</h1><div className="upload"><input aria-label="Файл XLSX" type="file" accept=".xlsx" onChange={event => setFile(event.target.files?.[0] ?? null)} /><button disabled={!file || !event.data} onClick={upload}>Проверить файл</button></div>{error && <Status type="error">{error}</Status>}{batch && <><div className="stats"><article><strong>{batch.created_rows}</strong><span>Добавится</span></article><article><strong>{batch.updated_rows}</strong><span>Обновится</span></article><article><strong>{batch.deactivated_rows}</strong><span>Деактивируется</span></article><article><strong>{batch.error_rows}</strong><span>Ошибок</span></article></div><p>Статус: <strong>{batch.status}</strong></p>{batch.error_rows === 0 && batch.status === "READY_TO_CONFIRM" && <button onClick={confirm}>Подтвердить импорт</button>}<button className="secondary" onClick={() => download(`/admin/imports/${batch.id}/errors.xlsx`, `import-${batch.id}-errors.xlsx`)}>Скачать отчёт</button></>}</section>;
 }
 
