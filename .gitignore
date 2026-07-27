@@ -11,4 +11,6 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 coverage/
+certbot-www/
+tls/
 .DS_Store
