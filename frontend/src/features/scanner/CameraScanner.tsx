@@ -9,6 +9,10 @@ export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
 
   async function start() {
     setError("");
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setError("Камера доступна только по HTTPS. Откройте https://168.222.202.190 и попробуйте снова.");
+      return;
+    }
     try {
       const reader = new BrowserQRCodeReader(undefined, { delayBetweenScanAttempts: 250 });
       controlsRef.current = await reader.decodeFromConstraints({ video: { facingMode: { ideal: "environment" } } }, videoRef.current!, (result) => {
@@ -18,8 +22,17 @@ export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
         lastCode.current = { value: result.getText(), at: now };
         onCode(result.getText());
       });
-    } catch {
-      setError("Не удалось получить доступ к камере. Разрешите доступ или используйте ручной ввод.");
+    } catch (reason) {
+      const name = reason instanceof DOMException ? reason.name : "";
+      if (name === "NotAllowedError") {
+        setError("Доступ к камере запрещён. Разрешите камеру для этого сайта в настройках браузера.");
+      } else if (name === "NotFoundError") {
+        setError("Камера не найдена на устройстве.");
+      } else if (name === "NotReadableError") {
+        setError("Камера занята другим приложением или недоступна.");
+      } else {
+        setError("Не удалось получить доступ к камере. Разрешите доступ или используйте ручной ввод.");
+      }
     }
   }
 
@@ -27,4 +40,3 @@ export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
   useEffect(() => stop, []);
   return <div className="scanner"><video ref={videoRef} muted playsInline /><div className="actions"><button onClick={start}>Включить камеру</button><button className="secondary" onClick={stop}>Остановить</button></div>{error && <p className="field-error" role="alert">{error}</p>}</div>;
 }
-
