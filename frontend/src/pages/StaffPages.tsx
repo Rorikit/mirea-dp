@@ -38,8 +38,32 @@ function tokenFromCode(code: string) { try { const url = new URL(code); return u
 export function ScannerPage() {
   const [manual, setManual] = useState("");
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [scanLocked, setScanLocked] = useState(false);
   const mutation = useMutation({ mutationFn: (code: string) => api<ScanResult>("/operator/scans", { method: "POST", body: JSON.stringify({ token: tokenFromCode(code), device_info: { user_agent: navigator.userAgent } }), headers: { "Idempotency-Key": idempotencyKey() } }), onSuccess: data => { setResult(data); navigator.vibrate?.(100); }, onError: () => navigator.vibrate?.([150, 80, 150]) });
-  return <section className="wide"><h1>QR-сканер</h1><CameraScanner onCode={code => !mutation.isPending && mutation.mutate(code)} /><div className="manual"><label>Ручной ввод кода<input value={manual} onChange={event => setManual(event.target.value)} /></label><button disabled={!manual || mutation.isPending} onClick={() => mutation.mutate(manual)}>Проверить</button></div>{mutation.isPending && <Status>Проверяем QR-код…</Status>}{mutation.error && <Status type="error">{errorMessage(mutation.error)}</Status>}{result && <Status type="success"><strong>{result.event_type === "ENTRY" ? "Вход разрешён" : "Выход зарегистрирован"}</strong><br />{result.full_name} · {result.study_group} · {result.institute}<br />{result.previous_status} → {result.new_status}</Status>}<Link to="/operator/recent">Последние операции</Link></section>;
+  function scan(code: string) {
+    if (scanLocked || mutation.isPending) return;
+    setResult(null);
+    setScanLocked(true);
+    mutation.mutate(code);
+  }
+  function continueScanning() {
+    mutation.reset();
+    setResult(null);
+    setManual("");
+    setScanLocked(false);
+  }
+  return <section className="wide">
+    <h1>QR-сканер</h1>
+    <CameraScanner onCode={scan} />
+    <div className="manual"><label>Ручной ввод кода<input value={manual} onChange={event => setManual(event.target.value)} /></label><button disabled={!manual || scanLocked || mutation.isPending} onClick={() => scan(manual)}>Проверить</button></div>
+    {(mutation.isPending || mutation.error || result) && <div className={`scan-feedback ${mutation.error ? "scan-feedback-error" : result ? "scan-feedback-success" : "scan-feedback-pending"}`} role="alert" aria-live="assertive">
+      {mutation.isPending && <><strong>Проверяем QR-код…</strong><span>Подождите результат</span></>}
+      {mutation.error && <><strong>Проход не выполнен</strong><span>{errorMessage(mutation.error)}</span></>}
+      {result && <><strong>{result.event_type === "ENTRY" ? "Вход разрешён" : "Выход зарегистрирован"}</strong><span>{result.full_name}</span><span>{result.study_group} · {result.institute}</span><span>{result.previous_status} → {result.new_status}</span></>}
+      {!mutation.isPending && <button onClick={continueScanning}>Сканировать следующий</button>}
+    </div>}
+    <Link to="/operator/recent">Последние операции</Link>
+  </section>;
 }
 
 export function RecentScansPage() {
